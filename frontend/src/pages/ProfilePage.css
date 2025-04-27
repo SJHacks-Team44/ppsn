@@ -1,0 +1,59 @@
+.profile-page {
+  min-height: 100vh;
+  background: #e6ecf0;
+  padding: 80px 20px 20px 20px;
+  box-sizing: border-box;
+}
+
+.profile-card {
+  background: white;
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 6px 15px rgba(0,0,0,0.1);
+  max-width: 500px;
+  margin: 0 auto 30px auto;
+  text-align: center;
+}
+
+.profile-card h2 {
+  margin-bottom: 10px;
+  color: #1e3c72;
+}
+
+.profile-card p {
+  margin-bottom: 8px;
+  font-size: 16px;
+}
+
+.routes-section {
+  background: white;
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 6px 15px rgba(0,0,0,0.1);
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.routes-section h3 {
+  margin-bottom: 20px;
+  color: #1e3c72;
+}
+
+.routes-list {
+  list-style: none;
+  padding: 0;
+}
+
+.routes-list li {
+  margin-bottom: 10px;
+  font-size: 16px;
+}
+
+.back-link {
+  display: block;
+  text-align: center;
+  margin-top: 30px;
+  text-decoration: none;
+  color: #1e3c72;
+  font-weight: bold;
+}

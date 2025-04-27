@@ -1,321 +1,312 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useContext } from 'react';
+import { Link } from 'react-router-dom';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { MapContext } from '../MapContext';
+import { auth, db } from '../firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import Papa from 'papaparse';
+import Navbar from '../components/Navbar'; // ✅ Correct import
 import './MapPage.css';
-import { db } from '../Firebase';
-import { collection, addDoc } from 'firebase/firestore';
 
-mapboxgl.accessToken = process.env.REACT_APP_MAPBOX_ACCESS_TOKEN;
+mapboxgl.accessToken = 'pk.eyJ1IjoiZGh3YW5pbDE5MDciLCJhIjoiY205eXdvbWVzMWl0ODJscHZ1YWswa3VybyJ9.ifIhgY8CvD7JAD7Ug4MlxA'; // Replace with your real Mapbox token
 
 function MapPage() {
   const mapContainer = useRef(null);
   const map = useRef(null);
-  const [lng, setLng] = useState(-121.8863);
-  const [lat, setLat] = useState(37.3382);
-  const [zoom, setZoom] = useState(11);
-  const [loading, setLoading] = useState(true);
+
+  const {
+    startLocation, setStartLocation,
+    endLocation, setEndLocation,
+    savedRoute, setSavedRoute,
+    directionsText, setDirectionsText,
+    crimeStats, setCrimeStats
+  } = useContext(MapContext);
+
+  const [startSuggestions, setStartSuggestions] = useState([]);
+  const [endSuggestions, setEndSuggestions] = useState([]);
+  const [popupMessage, setPopupMessage] = useState('');
   const [crimeData, setCrimeData] = useState([]);
-  const [filter, setFilter] = useState('all');
-  const [startLocation, setStartLocation] = useState('');
-  const [endLocation, setEndLocation] = useState('');
-  const [incidentType, setIncidentType] = useState('');
-
-  const generateCrimeData = () => {
-    const crimeTypes = ['Assault', 'Theft', 'Burglary', 'Vehicle Theft', 'Robbery', 'Vandalism', 'Drug Offense', 'DUI', 'Fraud'];
-    const descriptions = {
-      'Assault': 'Reported assault incident',
-      'Theft': 'Personal property theft',
-      'Burglary': 'Home break-in reported',
-      'Vehicle Theft': 'Vehicle stolen from this area',
-      'Robbery': 'Armed robbery incident',
-      'Vandalism': 'Property damaged/vandalized',
-      'Drug Offense': 'Drug-related activity reported',
-      'DUI': 'Driving under influence arrest',
-      'Fraud': 'Reported fraud incident'
-    };
-
-    const data = [];
-    for (let i = 0; i < 25; i++) {
-      const type = crimeTypes[Math.floor(Math.random() * 5)];
-      data.push({
-        id: `downtown-${i}`,
-        type,
-        coordinates: [
-          -121.89 + (Math.random() * 0.03 - 0.015),
-          37.33 + (Math.random() * 0.03 - 0.015)
-        ],
-        description: descriptions[type],
-        severity: Math.random() > 0.5 ? 'high' : 'medium',
-        date: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toLocaleDateString()
-      });
-    }
-    return data;
-  };
 
   useEffect(() => {
-    setTimeout(() => {
-      setCrimeData(generateCrimeData());
-      setLoading(false);
-    }, 1000);
+    fetch('/crime-data.csv')
+      .then(response => response.text())
+      .then(csvText => {
+        const parsed = Papa.parse(csvText, { header: true });
+        const crimes = parsed.data
+          .filter(d => d.longitude && d.latitude)
+          .map(d => ({
+            lng: parseFloat(d.longitude),
+            lat: parseFloat(d.latitude),
+            type: d.type || 'Unknown'
+          }));
+        setCrimeData(crimes);
+      });
   }, []);
 
   useEffect(() => {
     if (map.current) return;
-    if (!mapContainer.current) {
-      console.error("Map container is not ready yet!");
-      return;
-    }
-
-    mapContainer.current.style.height = '700px';
-
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/dark-v11',
-      center: [lng, lat],
-      zoom: zoom
+      style: 'mapbox://styles/mapbox/dark-v10',
+      center: [-121.8863, 37.3382],
+      zoom: 12
     });
-
     map.current.addControl(new mapboxgl.NavigationControl());
-
-    map.current.on('load', () => {
-      map.current.addSource('crime-data', {
-        type: 'geojson',
-        data: {
-          type: 'FeatureCollection',
-          features: []
-        }
-      });
-
-      map.current.addLayer({
-        id: 'crime-heat',
-        type: 'heatmap',
-        source: 'crime-data',
-        paint: {
-          'heatmap-weight': ['interpolate', ['linear'], ['get', 'severity', ['get', 'properties']], 'low', 0.5, 'medium', 0.8, 'high', 1],
-          'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 8, 0.5, 12, 1],
-          'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 8, 15, 12, 25],
-          'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 8, 0.9, 12, 0.5]
-        }
-      });
-
-      map.current.addLayer({
-        id: 'crime-points',
-        type: 'circle',
-        source: 'crime-data',
-        minzoom: 11,
-        paint: {
-          'circle-color': '#ff0000',
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 4, 16, 12],
-          'circle-stroke-width': 1,
-          'circle-stroke-color': '#ffffff',
-          'circle-opacity': 0.8
-        }
-      });
-    });
-
-    map.current.on('move', () => {
-      setLng(parseFloat(map.current.getCenter().lng.toFixed(4)));
-      setLat(parseFloat(map.current.getCenter().lat.toFixed(4)));
-      setZoom(parseFloat(map.current.getZoom().toFixed(2)));
-    });
-
-    const resizeMap = () => {
-      if (map.current) {
-        map.current.resize();
-      }
-    };
-    setTimeout(resizeMap, 500);
-    window.addEventListener('resize', resizeMap);
-
-    return () => {
-      window.removeEventListener('resize', resizeMap);
-      if (map.current) {
-        map.current.remove();
-      }
-    };
   }, []);
 
   useEffect(() => {
-    if (!map.current || !map.current.isStyleLoaded() || crimeData.length === 0) return;
+    if (!crimeData.length || !map.current || !map.current.isStyleLoaded()) return;
 
-    const geojson = {
-      type: 'FeatureCollection',
-      features: crimeData.map(crime => ({
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: crime.coordinates },
-        properties: { id: crime.id, type: crime.type, description: crime.description, severity: crime.severity, date: crime.date }
-      }))
-    };
-
-    if (map.current.getSource('crime-data')) {
-      map.current.getSource('crime-data').setData(geojson);
-    }
+    crimeData.forEach((crime) => {
+      new mapboxgl.Marker({ color: 'red' })
+        .setLngLat([crime.lng, crime.lat])
+        .setPopup(new mapboxgl.Popup().setText(crime.type))
+        .addTo(map.current);
+    });
   }, [crimeData]);
 
-  const handleRouteSubmit = (e) => {
-    e.preventDefault();
-    console.log(`Finding route from ${startLocation} to ${endLocation}`);
-  };
+  useEffect(() => {
+    if (!savedRoute || !map.current || !map.current.isStyleLoaded()) return;
 
-  const submitIncident = async (e) => {
-    e.preventDefault();
-    if (!startLocation || !incidentType) {
-      alert("Please enter a location and select an incident type before submitting!");
+    if (map.current.getSource('route')) {
+      map.current.removeLayer('route');
+      map.current.removeSource('route');
+    }
+
+    map.current.addSource('route', {
+      type: 'geojson',
+      data: {
+        type: 'Feature',
+        geometry: savedRoute
+      }
+    });
+
+    map.current.addLayer({
+      id: 'route',
+      type: 'line',
+      source: 'route',
+      paint: {
+        'line-color': '#00ff88',
+        'line-width': 6
+      }
+    });
+  }, [savedRoute]);
+
+  // Hide dropdowns if click outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setStartSuggestions([]);
+      setEndSuggestions([]);
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, []);
+
+  const handleSearch = async (text, type) => {
+    if (!text) {
+      type === 'start' ? setStartSuggestions([]) : setEndSuggestions([]);
       return;
     }
     try {
-      await addDoc(collection(db, "incidents"), {
-        when: new Date().toISOString(),
-        where: startLocation,
-        what: incidentType,
-        severity: "High"
-      });
-      console.log("✅ Incident submitted successfully!");
-      alert("Incident submitted! Thank you.");
-      setStartLocation('');
-      setIncidentType('');
+      const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(text)}.json?autocomplete=true&access_token=${mapboxgl.accessToken}`);
+      const data = await res.json();
+      const suggestions = data.features ? data.features.map(f => f.place_name) : [];
+      type === 'start' ? setStartSuggestions(suggestions) : setEndSuggestions(suggestions);
     } catch (error) {
-      console.error("❌ Error submitting incident:", error);
-      alert("Error submitting incident. Please try again.");
+      console.error('Autocomplete error:', error);
     }
   };
 
-  const submitCurrentLocationIncident = async (e) => {
-    e.preventDefault();
-    if (!incidentType) {
-      alert("Please select an incident type first!");
-      return;
+  const handleSelectSuggestion = (address, type) => {
+    if (type === 'start') {
+      setStartLocation(address);
+      setStartSuggestions([]);
+    } else {
+      setEndLocation(address);
+      setEndSuggestions([]);
     }
-    if (!navigator.geolocation) {
-      alert("Geolocation is not supported by your browser");
-      return;
+  };
+
+  const geocodeLocation = async (address) => {
+    const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?access_token=${mapboxgl.accessToken}`);
+    const data = await res.json();
+    if (data.features && data.features.length > 0) {
+      return data.features[0].geometry.coordinates;
     }
-    navigator.geolocation.getCurrentPosition(async (position) => {
-      const { latitude, longitude } = position.coords;
-      try {
-        await addDoc(collection(db, "incidents"), {
-          when: new Date().toISOString(),
-          coordinates: [longitude, latitude],
-          what: incidentType,
-          severity: "High"
-        });
-        console.log("✅ Incident with GPS submitted!");
-        alert("Incident at your current location submitted!");
-        setIncidentType('');
-      } catch (error) {
-        console.error("❌ Error submitting GPS incident:", error);
-        alert("Error submitting incident. Please try again.");
-      }
-    }, (error) => {
-      console.error("Geolocation error:", error);
-      alert("Failed to get your location.");
+    throw new Error('Location not found');
+  };
+
+  const saveRouteToFirestore = async (startLocation, endLocation, routeCoordinates) => {
+    if (!auth.currentUser) return;
+  
+    const routeRef = doc(db, "routes", `${startLocation}-${endLocation}`);
+    await setDoc(routeRef, {
+      userId: auth.currentUser.uid,
+      start: startLocation,
+      end: endLocation,
+      route: JSON.stringify(routeCoordinates), // 🔥 Save route as string
+      createdAt: new Date(),
     });
+  };
+  
+
+  const handleFindRoute = async () => {
+    if (!startLocation || !endLocation) {
+      setPopupMessage('Please enter both start and end locations.');
+      return;
+    }
+    try {
+      const startCoords = await geocodeLocation(startLocation);
+      const endCoords = await geocodeLocation(endLocation);
+
+      const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${startCoords[0]},${startCoords[1]};${endCoords[0]},${endCoords[1]}?steps=true&geometries=geojson&access_token=${mapboxgl.accessToken}`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (data.routes && data.routes.length > 0) {
+        const route = data.routes[0].geometry;
+        const steps = data.routes[0].legs[0].steps;
+
+        setSavedRoute(route);
+
+        // Save route to Firestore
+        saveRouteToFirestore(startLocation, endLocation, route.coordinates);
+
+        const text = steps.map((step, idx) => `${idx + 1}. ${step.maneuver.instruction}`).join('\n');
+        setDirectionsText(text);
+      } else {
+        setPopupMessage('No route found.');
+      }
+    } catch (error) {
+      console.error(error);
+      setPopupMessage('Error finding route.');
+    }
+  };
+
+  const downloadDirections = () => {
+    const element = document.createElement("a");
+    const file = new Blob([directionsText], { type: 'text/plain' });
+    element.href = URL.createObjectURL(file);
+    element.download = "directions.txt";
+    document.body.appendChild(element);
+    element.click();
   };
 
   return (
-    <div className="main-layout">
-      <div className="map-area">
-        <div className="map-title">
-          <h2>🌎 SAN JOSE SAFETY MAP</h2>
-          <span className="status">● {!loading ? 'ACTIVE' : 'LOADING...'}</span>
-        </div>
+    <div>
+      <Navbar />
+      <div className="page-layout">
+        <div className="sidebar">
+          <h2>Safest Route Finder</h2>
 
-        <div className="filter-controls">
-          <label htmlFor="crimeFilter" className="filter-label">Filter by crime type:</label>
-          <select
-            id="crimeFilter"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="filter-select"
-          >
-            <option value="all">All Crimes</option>
-          </select>
-        </div>
-
-        <div className="map-wrapper">
-          <div ref={mapContainer} className="map-container"></div>
-          {loading && (
-            <div className="loading-overlay">
-              <div className="loading-text">Loading crime data...</div>
+          <div className="form">
+            {/* Start and End Inputs */}
+            <div className="form-group">
+              <label>Start Location</label>
+              <input
+                type="text"
+                value={startLocation}
+                onChange={(e) => {
+                  setStartLocation(e.target.value);
+                  handleSearch(e.target.value, 'start');
+                }}
+                placeholder="Enter start address"
+              />
+              {startSuggestions.length > 0 && (
+                <ul className="suggestions">
+                  {startSuggestions.map((sug, idx) => (
+                    <li key={idx} onClick={() => handleSelectSuggestion(sug, 'start')}>
+                      {sug}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
-          )}
-          <div className="coordinates-box">
-            📍 {lng}, {lat} | 🔍 Zoom: {zoom}
+
+            <div className="form-group">
+              <label>End Location</label>
+              <input
+                type="text"
+                value={endLocation}
+                onChange={(e) => {
+                  setEndLocation(e.target.value);
+                  handleSearch(e.target.value, 'end');
+                }}
+                placeholder="Enter end address"
+              />
+              {endSuggestions.length > 0 && (
+                <ul className="suggestions">
+                  {endSuggestions.map((sug, idx) => (
+                    <li key={idx} onClick={() => handleSelectSuggestion(sug, 'end')}>
+                      {sug}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* Find Route Button */}
+            <button className="find-route-button" onClick={handleFindRoute}>Find Safest Route</button>
+
+            {/* Profile Link */}
+            <Link to="/profile" className="profile-link">👤 My Profile</Link>
+
+            {/* Directions Viewer */}
+            {directionsText && (
+              <div className="directions-viewer">
+                <h3>Directions:</h3>
+                <div className="directions-scroll">
+                  {directionsText.split('\n').map((step, idx) => {
+                    let icon = '➡️'; // Default straight
+                    if (step.toLowerCase().includes('left')) icon = '⬅️';
+                    else if (step.toLowerCase().includes('right')) icon = '➡️';
+                    else if (step.toLowerCase().includes('continue')) icon = '⬆️';
+                    else if (step.toLowerCase().includes('u-turn')) icon = '🔄';
+                    else if (step.toLowerCase().includes('arrive')) icon = '🛑';
+
+                    return (
+                      <div key={idx} className="direction-step">
+                        <span className="direction-icon">{icon}</span>
+                        <span className="direction-text">{step}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Download Button at Bottom */}
+                <button className="download-button" onClick={downloadDirections}>
+                  📥 Download Directions
+                </button>
+              </div>
+            )}
+
+            {/* Crime Stats */}
+            {crimeStats.total > 0 && (
+              <div className="stats-dashboard">
+                <h3>Crime Stats Near Route</h3>
+                <p>Total Crimes: {crimeStats.total}</p>
+                <ul>
+                  {Object.entries(crimeStats.breakdown).map(([type, count], idx) => (
+                    <li key={idx}>{type}: {count}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="source-note">
-          <p>Note: This is a prototype visualization using simulated data based on San Jose crime patterns.</p>
-        </div>
+        <div className="map-container" ref={mapContainer} />
       </div>
 
-      <div className="sidebar">
-        <h3>🔍 Find Safe Route / Report Incident</h3>
-        <div className="route-form">
-          {/* Find Safe Route */}
-          <form onSubmit={handleRouteSubmit}>
-            <div className="form-input">
-              <label htmlFor="startLocation">Starting Location</label>
-              <input
-                type="text"
-                id="startLocation"
-                name="startLocation"
-                placeholder="🏠 Your location"
-                value={startLocation}
-                onChange={(e) => setStartLocation(e.target.value)}
-              />
-            </div>
-            <div className="form-input">
-              <label htmlFor="endLocation">Destination</label>
-              <input
-                type="text"
-                id="endLocation"
-                name="endLocation"
-                placeholder="🎯 Destination"
-                value={endLocation}
-                onChange={(e) => setEndLocation(e.target.value)}
-              />
-            </div>
-            <button type="submit" className="route-button">FIND SAFEST ROUTE</button>
-          </form>
-
-          {/* 🚨 Report Incident */}
-          <form onSubmit={submitIncident} style={{ marginTop: '20px' }}>
-            <h4>🚨 Report an Incident</h4>
-
-            <div className="form-input">
-              <label htmlFor="incidentType">Incident Type</label>
-              <select
-                id="incidentType"
-                value={incidentType}
-                onChange={(e) => setIncidentType(e.target.value)}
-              >
-                <option value="">Select Incident Type</option>
-                <option value="Assault">Assault</option>
-                <option value="Theft">Theft</option>
-                <option value="Burglary">Burglary</option>
-                <option value="Vehicle Theft">Vehicle Theft</option>
-                <option value="Robbery">Robbery</option>
-                <option value="Vandalism">Vandalism</option>
-                <option value="Drug Offense">Drug Offense</option>
-                <option value="DUI">DUI</option>
-                <option value="Fraud">Fraud</option>
-              </select>
-            </div>
-
-            <button type="submit" className="route-button" style={{ marginTop: '10px' }}>
-              Submit Manual Location
-            </button>
-            <button
-              onClick={submitCurrentLocationIncident}
-              className="route-button"
-              style={{ marginTop: '10px' }}
-            >
-              Submit My Current Location
-            </button>
-          </form>
+      {popupMessage && (
+        <div className="custom-popup">
+          <p>{popupMessage}</p>
+          <button onClick={() => setPopupMessage('')}>Dismiss</button>
         </div>
-      </div>
+      )}
     </div>
   );
 }
