@@ -1,6 +1,8 @@
 from flask import Blueprint, request, jsonify
 from google.cloud import firestore
 from datetime import datetime
+from notifications import send_notification
+
 
 policecalls_blueprint = Blueprint('policecalls', __name__)
 db = firestore.Client()
