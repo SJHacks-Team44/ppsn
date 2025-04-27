@@ -9,11 +9,12 @@ import Papa from 'papaparse';
 import Navbar from '../components/Navbar';
 import './MapPage.css';
 
-mapboxgl.accessToken = 'pk.eyJ1IjoiZGh3YW5pbDE5MDciLCJhIjoiY205eXdvbWVzMWl0ODJscHZ1YWswa3VybyJ9.ifIhgY8CvD7JAD7Ug4MlxA'; // <-- replace with your real token
+mapboxgl.accessToken = 'pk.eyJ1IjoiZGh3YW5pbDE5MDciLCJhIjoiY205eXdvbWVzMWl0ODJscHZ1YWswa3VybyJ9.ifIhgY8CvD7JAD7Ug4MlxA'; // Replace with your real Mapbox token
 
 function MapPage() {
   const mapContainer = useRef(null);
   const map = useRef(null);
+  const userMarker = useRef(null); // For the tracking marker
 
   const {
     startLocation, setStartLocation,
@@ -103,7 +104,7 @@ function MapPage() {
       setSearchAgainEnd(null);
       setTimeout(() => {
         handleFindRoute();
-      }, 300); // Small delay so map is ready
+      }, 300);
     }
   }, [searchAgainStart, searchAgainEnd]);
 
@@ -188,6 +189,8 @@ function MapPage() {
 
         const text = steps.map((step, idx) => `${idx + 1}. ${step.maneuver.instruction}`).join('\n');
         setDirectionsText(text);
+
+        simulateSmoothMovement(route.coordinates); // Start moving along route
       } else {
         setPopupMessage('No route found.');
       }
@@ -195,6 +198,51 @@ function MapPage() {
       console.error(error);
       setPopupMessage('Error finding route.');
     }
+  };
+
+  const simulateSmoothMovement = (routeCoords) => {
+    if (userMarker.current) {
+      userMarker.current.remove();
+    }
+
+    if (!routeCoords || routeCoords.length === 0) return;
+
+    userMarker.current = new mapboxgl.Marker({ color: 'cyan' })
+      .setLngLat(routeCoords[0])
+      .addTo(map.current);
+
+    let currentIndex = 0;
+    const speed = 0.02; // Adjust speed here (smaller = slower)
+
+    const move = () => {
+      if (currentIndex >= routeCoords.length - 1) return;
+
+      const [lng1, lat1] = routeCoords[currentIndex];
+      const [lng2, lat2] = routeCoords[currentIndex + 1];
+
+      let t = 0;
+
+      const animate = () => {
+        if (t > 1) {
+          currentIndex++;
+          if (currentIndex < routeCoords.length - 1) {
+            move();
+          }
+          return;
+        }
+
+        const lng = lng1 + (lng2 - lng1) * t;
+        const lat = lat1 + (lat2 - lat1) * t;
+        userMarker.current.setLngLat([lng, lat]);
+
+        t += speed;
+        requestAnimationFrame(animate);
+      };
+
+      animate();
+    };
+
+    move();
   };
 
   const downloadDirections = () => {
