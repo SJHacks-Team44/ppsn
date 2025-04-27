@@ -5,7 +5,7 @@ def import_csv():
     db = firestore.Client()
     collection_ref = db.collection('policecalls')
 
-    df = pd.read_csv('./data/cleaned_crime_reports_no_datetime.csv')
+    df = pd.read_csv('./data/cleaned_crime_reports.csv')
 
     # Insert data into Firestore
     for _, row in df.iterrows():

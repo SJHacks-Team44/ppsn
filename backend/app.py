@@ -1,12 +1,16 @@
 from flask import Flask
 from flask_cors import CORS
-from routes.policecalls import policecalls_blueprint
+from routes_policecalls import policecalls_blueprint
 
-app = Flask(__name__)
-CORS(app)
+def create_app():
+    app = Flask(__name__)
+    CORS(app)
 
-# Register blueprints
-app.register_blueprint(policecalls_blueprint, url_prefix='/api/policecalls')
+    # Register Blueprints
+    app.register_blueprint(policecalls_blueprint, url_prefix='/api/policecalls')
+
+    return app
 
 if __name__ == "__main__":
+    app = create_app()
     app.run(debug=True)
