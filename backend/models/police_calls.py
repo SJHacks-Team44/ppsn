@@ -1,28 +1,19 @@
-from db import get_db_connection
+from google.cloud import firestore
 
 def get_police_calls(limit=500):
-    conn = get_db_connection()
-    cur = conn.cursor()
+    db = firestore.Client()
+    collection_ref = db.collection('policecalls')
+    docs = collection_ref.limit(limit).stream()
 
-    cur.execute("""
-        SELECT incident_type, address, latitude, longitude, datetime
-        FROM policecalls
-        LIMIT %s
-    """, (limit,))
-    
-    rows = cur.fetchall()
-    
     calls = []
-    for row in rows:
+    for doc in docs:
+        data = doc.to_dict()
         calls.append({
-            "incident_type": row[0],
-            "address": row[1],
-            "latitude": row[2],
-            "longitude": row[3],
-            "datetime": row[4].isoformat() if row[4] else None
+            "incident_type": data.get('type'),
+            "address": data.get('description'),  # 🔵 Replaced 'address' with 'description' (similar meaning)
+            "latitude": data.get('latitude'),
+            "longitude": data.get('longitude'),
+            "datetime": data.get('date')
         })
-    
-    cur.close()
-    conn.close()
-    
+
     return calls

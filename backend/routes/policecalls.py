@@ -1,47 +1,41 @@
 from flask import Blueprint, request, jsonify
-from db import get_db_connection
+from google.cloud import firestore
 
 policecalls_blueprint = Blueprint('policecalls', __name__)
+db = firestore.Client()
+collection_ref = db.collection('policecalls')
 
 @policecalls_blueprint.route('/', methods=['GET'])
 def get_all_calls():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('SELECT id, type, description, severity, latitude, longitude, date FROM policecalls')
-    rows = cursor.fetchall()
-    conn.close()
+    docs = collection_ref.stream()
 
     crimes = []
-    for row in rows:
+    for doc in docs:
+        data = doc.to_dict()
         crime = {
-            'id': row[0],
-            'type': row[1],
-            'description': row[2],
-            'severity': row[3],
-            'coordinates': [row[5], row[4]],  # [lng, lat]
-            'date': row[6]
+            'id': doc.id,
+            'type': data.get('type'),
+            'description': data.get('description'),
+            'severity': data.get('severity'),
+            'coordinates': [data.get('longitude'), data.get('latitude')],  # [lng, lat]
+            'date': data.get('date')
         }
         crimes.append(crime)
-    
+
     return jsonify(crimes)
 
-@policecalls_blueprint.route('/', methods=['POST'])
+@policecalls_blueprint.route('/report', methods=['POST'])
 def report_call():
     data = request.json
-    crime_type = data.get('type')
-    description = data.get('description')
-    severity = data.get('severity')
-    latitude = data.get('latitude')
-    longitude = data.get('longitude')
-    date = data.get('date')
+    required_fields = ['type', 'description', 'severity', 'latitude', 'longitude', 'date']
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO policecalls (type, description, severity, latitude, longitude, date)
-        VALUES (%s, %s, %s, %s, %s, %s)
-    ''', (crime_type, description, severity, latitude, longitude, date))
-    conn.commit()
-    conn.close()
+    # Basic validation
+    if not all(field in data for field in required_fields):
+        return jsonify({'error': 'Missing required fields'}), 400
 
-    return jsonify({'message': 'Crime report submitted successfully!'}), 201
+    try:
+        doc_ref = collection_ref.document()
+        doc_ref.set(data)
+        return jsonify({'message': 'Crime report submitted successfully!'}), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
