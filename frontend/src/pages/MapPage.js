@@ -6,10 +6,10 @@ import { MapContext } from '../MapContext';
 import { auth, db } from '../firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import Papa from 'papaparse';
-import Navbar from '../components/Navbar'; // ✅ Correct import
+import Navbar from '../components/Navbar';
 import './MapPage.css';
 
-mapboxgl.accessToken = 'pk.eyJ1IjoiZGh3YW5pbDE5MDciLCJhIjoiY205eXdvbWVzMWl0ODJscHZ1YWswa3VybyJ9.ifIhgY8CvD7JAD7Ug4MlxA'; // Replace with your real Mapbox token
+mapboxgl.accessToken = 'pk.eyJ1IjoiZGh3YW5pbDE5MDciLCJhIjoiY205eXdvbWVzMWl0ODJscHZ1YWswa3VybyJ9.ifIhgY8CvD7JAD7Ug4MlxA'; // <-- replace with your real token
 
 function MapPage() {
   const mapContainer = useRef(null);
@@ -20,7 +20,9 @@ function MapPage() {
     endLocation, setEndLocation,
     savedRoute, setSavedRoute,
     directionsText, setDirectionsText,
-    crimeStats, setCrimeStats
+    crimeStats, setCrimeStats,
+    searchAgainStart, setSearchAgainStart,
+    searchAgainEnd, setSearchAgainEnd
   } = useContext(MapContext);
 
   const [startSuggestions, setStartSuggestions] = useState([]);
@@ -93,6 +95,18 @@ function MapPage() {
     });
   }, [savedRoute]);
 
+  useEffect(() => {
+    if (searchAgainStart && searchAgainEnd) {
+      setStartLocation(searchAgainStart);
+      setEndLocation(searchAgainEnd);
+      setSearchAgainStart(null);
+      setSearchAgainEnd(null);
+      setTimeout(() => {
+        handleFindRoute();
+      }, 300); // Small delay so map is ready
+    }
+  }, [searchAgainStart, searchAgainEnd]);
+
   // Hide dropdowns if click outside
   useEffect(() => {
     const handleClickOutside = () => {
@@ -141,17 +155,16 @@ function MapPage() {
 
   const saveRouteToFirestore = async (startLocation, endLocation, routeCoordinates) => {
     if (!auth.currentUser) return;
-  
+
     const routeRef = doc(db, "routes", `${startLocation}-${endLocation}`);
     await setDoc(routeRef, {
       userId: auth.currentUser.uid,
       start: startLocation,
       end: endLocation,
-      route: JSON.stringify(routeCoordinates), // 🔥 Save route as string
+      route: JSON.stringify(routeCoordinates), // Save safely
       createdAt: new Date(),
     });
   };
-  
 
   const handleFindRoute = async () => {
     if (!startLocation || !endLocation) {
@@ -171,8 +184,6 @@ function MapPage() {
         const steps = data.routes[0].legs[0].steps;
 
         setSavedRoute(route);
-
-        // Save route to Firestore
         saveRouteToFirestore(startLocation, endLocation, route.coordinates);
 
         const text = steps.map((step, idx) => `${idx + 1}. ${step.maneuver.instruction}`).join('\n');
@@ -203,7 +214,6 @@ function MapPage() {
           <h2>Safest Route Finder</h2>
 
           <div className="form">
-            {/* Start and End Inputs */}
             <div className="form-group">
               <label>Start Location</label>
               <input
@@ -248,19 +258,16 @@ function MapPage() {
               )}
             </div>
 
-            {/* Find Route Button */}
             <button className="find-route-button" onClick={handleFindRoute}>Find Safest Route</button>
 
-            {/* Profile Link */}
             <Link to="/profile" className="profile-link">👤 My Profile</Link>
 
-            {/* Directions Viewer */}
             {directionsText && (
               <div className="directions-viewer">
                 <h3>Directions:</h3>
                 <div className="directions-scroll">
                   {directionsText.split('\n').map((step, idx) => {
-                    let icon = '➡️'; // Default straight
+                    let icon = '➡️'; // Default
                     if (step.toLowerCase().includes('left')) icon = '⬅️';
                     else if (step.toLowerCase().includes('right')) icon = '➡️';
                     else if (step.toLowerCase().includes('continue')) icon = '⬆️';
@@ -276,23 +283,9 @@ function MapPage() {
                   })}
                 </div>
 
-                {/* Download Button at Bottom */}
                 <button className="download-button" onClick={downloadDirections}>
                   📥 Download Directions
                 </button>
-              </div>
-            )}
-
-            {/* Crime Stats */}
-            {crimeStats.total > 0 && (
-              <div className="stats-dashboard">
-                <h3>Crime Stats Near Route</h3>
-                <p>Total Crimes: {crimeStats.total}</p>
-                <ul>
-                  {Object.entries(crimeStats.breakdown).map(([type, count], idx) => (
-                    <li key={idx}>{type}: {count}</li>
-                  ))}
-                </ul>
               </div>
             )}
           </div>

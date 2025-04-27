@@ -1,15 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { auth, db } from '../firebase';
 import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
-import { Link } from 'react-router-dom';
-import './ProfilePage.css'; // ✅ we'll style it
+import { Link, useNavigate } from 'react-router-dom';
+import { MapContext } from '../MapContext'; // Add this
+import './ProfilePage.css'; // Styling
 
 function ProfilePage() {
   const [user, setUser] = useState(null);
   const [userProfile, setUserProfile] = useState({});
   const [userRoutes, setUserRoutes] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const navigate = useNavigate();
+  const { setSearchAgainStart, setSearchAgainEnd } = useContext(MapContext);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -31,6 +35,12 @@ function ProfilePage() {
     return () => unsubscribe();
   }, []);
 
+  const handleSearchAgain = (start, end) => {
+    setSearchAgainStart(start);
+    setSearchAgainEnd(end);
+    navigate('/');
+  };
+
   if (loading) return <p>Loading...</p>;
 
   return (
@@ -48,13 +58,15 @@ function ProfilePage() {
             {userRoutes.length === 0 ? (
               <p>No routes saved yet.</p>
             ) : (
-              <ul className="routes-list">
+              <div className="routes-grid">
                 {userRoutes.map((route, idx) => (
-                  <li key={idx}>
-                    {route.start} ➔ {route.end}
-                  </li>
+                  <div className="route-card" key={idx}>
+                    <p><strong>From:</strong> {route.start}</p>
+                    <p><strong>To:</strong> {route.end}</p>
+                    <button onClick={() => handleSearchAgain(route.start, route.end)}>🔎 Search Again</button>
+                  </div>
                 ))}
-              </ul>
+              </div>
             )}
           </div>
 

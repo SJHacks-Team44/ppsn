@@ -8,6 +8,8 @@ export function MapProvider({ children }) {
   const [savedRoute, setSavedRoute] = useState(null);
   const [directionsText, setDirectionsText] = useState('');
   const [crimeStats, setCrimeStats] = useState({ total: 0, breakdown: {} });
+  const [searchAgainStart, setSearchAgainStart] = useState(null);
+  const [searchAgainEnd, setSearchAgainEnd] = useState(null);
 
   return (
     <MapContext.Provider
@@ -21,7 +23,11 @@ export function MapProvider({ children }) {
         directionsText,
         setDirectionsText,
         crimeStats,
-        setCrimeStats
+        setCrimeStats,
+        searchAgainStart,
+        setSearchAgainStart,
+        searchAgainEnd,
+        setSearchAgainEnd
       }}
     >
       {children}
