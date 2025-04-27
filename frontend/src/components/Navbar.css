@@ -1,33 +1,45 @@
 .navbar {
-  background-color: #2a4b8d;
+  background-color: #0f3460;
   color: white;
-  padding: 10px 20px;
+  padding: 0 30px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  height: 60px;
+  height: 70px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
 }
 
 .logo h1 {
-  font-size: 1.5rem;
+  font-size: 28px;
   margin: 0;
+  font-weight: 700;
+  background: linear-gradient(to right, #00fff5, #7bed9f);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 
 .nav-links {
   display: flex;
   list-style: none;
+  margin: 0;
 }
 
 .nav-links li {
-  margin-left: 20px;
+  margin-left: 30px;
 }
 
 .nav-links a {
   color: white;
   text-decoration: none;
-  font-weight: bold;
+  font-weight: 500;
+  font-size: 18px;
+  padding: 8px 15px;
+  border-radius: 20px;
+  transition: all 0.3s;
 }
 
 .nav-links a:hover {
-  text-decoration: underline;
+  background-color: rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px);
 }
