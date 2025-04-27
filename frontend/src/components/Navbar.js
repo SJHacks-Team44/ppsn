@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { auth, logOut } from '../firebase';
+import { auth, logOut } from '../Firebase';
 import './Navbar.css';
 
 function Navbar() {

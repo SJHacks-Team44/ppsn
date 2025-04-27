@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { MapContext } from '../MapContext';
-import { auth, db } from '../firebase';
+import { auth, db } from '../Firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import Papa from 'papaparse';
 import Navbar from '../components/Navbar';

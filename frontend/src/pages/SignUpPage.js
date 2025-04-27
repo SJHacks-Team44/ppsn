@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { signUp } from '../firebase';
+import { signUp } from '../Firebase';
 import './AuthPage.css';
 
 function SignUpPage() {
