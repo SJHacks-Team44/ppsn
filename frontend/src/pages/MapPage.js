@@ -9,7 +9,7 @@ import Papa from 'papaparse';
 import Navbar from '../components/Navbar';
 import './MapPage.css';
 
-mapboxgl.accessToken = 'pk.eyJ1IjoiZGh3YW5pbDE5MDciLCJhIjoiY205eXdvbWVzMWl0ODJscHZ1YWswa3VybyJ9.ifIhgY8CvD7JAD7Ug4MlxA'; // Replace with your real Mapbox token
+mapboxgl.accessToken = 'YOUR_TOKEN'; // Replace with your real Mapbox token
 
 function MapPage() {
   const mapContainer = useRef(null);
