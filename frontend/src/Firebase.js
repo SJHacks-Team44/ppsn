@@ -3,11 +3,11 @@ import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, si
 import { getFirestore, doc, setDoc } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCKtwUbCpkBEREYSdyMZEiAhuMs3Rh78nQ",
+  apiKey: "YOUR_API_KEY",
   authDomain: "ppsn-hackathon.firebaseapp.com",
   projectId: "ppsn-hackathon",
   storageBucket: "ppsn-hackathon.firebasestorage.app",
-  messagingSenderId: "661873236491",
+  messagingSenderId: "YOUR_ID",
   appId: "1:661873236491:web:ae1316f1400522297f450e"
 };
 
